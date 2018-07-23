@@ -1,10 +1,16 @@
 package com.eventos.resources;
 
+import static org.springframework.hateoas.mvc.ControllerLinkBuilder.linkTo;
+import static org.springframework.hateoas.mvc.ControllerLinkBuilder.methodOn;
+
+import java.util.ArrayList;
+
 import javax.validation.Valid;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,9 +37,24 @@ public class EventoResource {
 	
 	@ApiOperation(value="Retorna uma lista de Eventos")
 	@GetMapping(produces="application/json")
-	public @ResponseBody Iterable<Evento> listaEventos() {
+	public @ResponseBody ArrayList<Evento> listaEventos() {
 		Iterable<Evento> listaEventos = er.findAll();
-		return listaEventos;
+		ArrayList<Evento> eventos = new ArrayList<Evento>();
+		for (Evento evento : listaEventos) {
+			long codigo = evento.getCodigo();
+			evento.add(linkTo(methodOn(EventoResource.class).evento(codigo)).withSelfRel());
+			eventos.add(evento);
+		}
+		return eventos;
+		
+	}
+	
+	@ApiOperation(value="Retorna um Evento Especifico")
+	@GetMapping(value="/{codigo}", produces="application/json")
+	public @ResponseBody Evento evento(@PathVariable(value="codigo") long codigo) {
+		Evento evento = er.findByCodigo(codigo);
+		evento.add(linkTo(methodOn(EventoResource.class).listaEventos()).withRel("Lista de Eventos"));
+		return evento;
 		
 	}
 
@@ -51,23 +72,16 @@ public class EventoResource {
 	}
 	
 	@ApiOperation(value="Atualiza Evento")
-	@PutMapping()
-	public Evento atualizaEvento (@PathVariable long codigo, @Valid @RequestBody Evento evento) {
-		Evento eventoSalvo = atualizar(codigo, evento);
-		return eventoSalvo;
-	}
-	
-	public Evento atualizar(Long codigo, Evento evento) {
-		Evento eventoSalvo = buscarEventoCodigo(codigo);
-		BeanUtils.copyProperties(evento, eventoSalvo, "codigo");
-		return er.save(eventoSalvo);
-	}
-	
-	public Evento buscarEventoCodigo (Long codigo) {
-		Evento eventoSalvo = er.findOne(codigo);
+	@PutMapping("/{codigo}")
+	public ResponseEntity<Evento> atualizaEvento (@PathVariable long codigo, @RequestBody Evento evento) {
+		Evento eventoSalvo = er.findByCodigo(codigo);
 		if (eventoSalvo == null) {
 			throw new EmptyResultDataAccessException(1);
 		}
-		return eventoSalvo;
+		BeanUtils.copyProperties(evento, eventoSalvo, "codigo");
+		er.save(eventoSalvo);
+		return ResponseEntity.ok(eventoSalvo);
 	}
+	
+	
 }
